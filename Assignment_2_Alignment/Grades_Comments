@@ -1,0 +1,9 @@
+Grade: 91.00 (max 100.00)
+
+Additional instructor's comments about your submission:
+
+Bowtie Alignment: (-5) the --no-unal option omits reads that haven't mapped from the sam file, which is why flagstat reports 100% of the reads were mapped. Knowing that Hisat is a transcript-aware aligner (and Bowtie isn't), we would expect Hisat to have higher mapping rates than Bowtie.
+
+Counts: (-4) You only looked at the head() (first 5 rows) -- something like nrow(counts[rowSums(counts)==0,]) for Q5.1 is a correct answer.
+
+Missing R code; please always include your code.
