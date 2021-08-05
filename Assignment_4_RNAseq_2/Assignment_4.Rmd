@@ -1,0 +1,338 @@
+---
+title: "Assignment_4"
+author: "Yasmin Rajendran"
+date: "March 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Libraries ,results='hide', message=FALSE, warning=FALSE}
+
+library(magrittr)
+
+library(data.table)
+
+library(dplyr)
+
+library(limma)
+
+library(edgeR)
+
+library(WriteXLS)
+
+library(devtools)
+
+library(GenomeInfoDbData)
+
+library(tidyverse)
+
+# from this site: http://bioinformatics.sph.harvard.edu/bcbioRNASeq/reference/tmm.html
+```
+
+
+```{r Load_file,results='hide', message=FALSE, warning=FALSE}
+
+load("HW2_mouse_brain_RNAseq_genelevel_counts.Rdata")
+
+ss_1 <- read.delim("hw2_exp_design.tsv")
+
+colnames(ss_1)
+
+```
+
+```{r}
+#Looking at ss_1
+
+head(ss_1)
+```
+
+
+(1) Perform a differential gene expression analysis. Save an xls file "diff_gene_NETID.xls" with a list of  differentially expressed genes with FDR <= 0.10.
+
+This requires a few steps:
+
+-First I must remove "low count features" (quoted from the RNA-seq limma example html file from NYU Classes)
+
+```{r}
+
+counts_1 <- counts 
+
+# Making a Bioconductor DGEList
+
+dge <- DGEList(counts=counts_1)
+
+# Remove the low counts
+
+isexpr_1 <- rowSums(dge$counts > 50) >=3  
+
+# I want to see how much of this is left
+
+sum(isexpr_1)/nrow(dge)
+
+```
+
+
+
+```{r}
+
+dge<- dge[isexpr_1,,keep.lib.sizes=FALSE]
+
+dim(dge)
+
+```
+
+- Then I have to do TMM normalization
+
+```{r}
+dge <- calcNormFactors(dge)
+```
+
+- I have to make a design matrix
+
+```{r}
+
+design <- model.matrix(~stressor, data=ss_1)
+
+```
+
+
+- Then I must "correct for Poisson count noise due to [the] discrete nature of RNA-seq" (quoted from the RNA-seq limma example html file from NYU Classes)
+
+```{r}
+# Dealing with Poisson Count Noise
+
+voooooooom <- voom(dge,design,plot=TRUE)
+
+```
+
+- Then I have to make linear models
+
+```{r}
+# Linear model
+
+fit <- lmFit(voooooooom,design)
+
+# "eBayes computes F (overall "omnibus" p-values) and (moderated) t-statistics for all genes"
+
+fit_2  <- eBayes(fit)
+
+# I need to see the column names
+
+colnames(fit_2)
+
+```
+
+- Now I much "[d]o FDR multiple testing correction" (quoted from the RNA-seq limma example html file from NYU Classes)
+
+```{r}
+
+R_stressor_NS = topTable(fit_2, coef="stressorNS", number=nrow(dge$counts)) 
+
+dim(R_stressor_NS[R_stressor_NS$adj.P.Val <= 0.1,])
+
+```
+
+- I will do differential expression analysis
+
+```{r}
+
+
+## Last part of this question make an excel "with a list of  differentially expressed genes with FDR <= 0.10"
+
+# Used this link to do the following : https://www.bioconductor.org/help/course-materials/2015/BioC2015/bioc2015rnaseq.html#de & as always NYU classes html/Rmd files
+
+sigGenes = list()
+sigGenes[["R_stressor_NS"]] = R_stressor_NS
+
+sigGenes_fdr10 = lapply(sigGenes, function(x) x[x[,"adj.P.Val"]<= 0.10,])
+
+# print number of significant genes
+lapply( sigGenes_fdr10, nrow)
+
+
+WriteXLS("sigGenes_fdr10",ExcelFileName=paste("diff_gene_yr542.xls",  sep=""),row.names=T, FreezeRow=1,FreezeCol=1,AdjWidth=F)   
+```
+
+
+
+End of Question 1
+_________________
+
+
+(2) Do a GSEA using the MSigDB (Hallmark) genesets (use the latest gene sets available from Wehi web site)
+
+
+```{r Question_Q2}
+
+
+load("Mm.H.symbol.Rdata")
+
+vooooom_Q2 <- voom(dge,design,plot=TRUE)
+
+Indices_Q2 <-ids2indices(Mm.H.symbol, rownames(vooooom_Q2))
+
+rr_resUP = list()
+rr_resDN = list()
+rr_resMIXED = list()
+
+
+# Following the html file from the homework
+
+rr <- romer(vooooom_Q2,Indices_Q2,design=design,contrast=ncol(design),nrot=1000)
+romerUP_rr=topRomer(rr,n=20,alt="up")
+romerDN_rr=topRomer(rr,alt="down")
+romerMIXED_rr=topRomer(rr,alt="mixed")
+
+romerUP_rr_1  = as.data.frame(romerUP_rr)
+
+rr_resUP = romerUP_rr_1
+
+res_dir = "./" 
+RData_dir = "./"
+
+```
+
+(3) Save as an xls file "GSEA_up_NETID.xls" the top 20 genesets ordered by p-value, for the assumption that all genes in a set will be perturbed with a positive fold change. Comment on your findings (you can refer to the original paper).
+
+Comment(s): Given the nature of using a p-value cut off getting genes that pass this cut off does not always mean that it is "significant" in the long run and therefore, although I am glad that I found something from this data it is unclear to me if this is significant given that there are issues with using p-value cut offs (https://www.sciencenews.org/blog/context/experts-issue-warning-problems-p-values). 
+
+```{r}
+WriteXLS("rr_resUP",Encoding="latin1",ExcelFileName=paste(res_dir,"GSEA_up_yr542.xls",  sep=""),row.names=F, FreezeRow=1,FreezeCol=1,AdjWidth=F)   
+
+save(rr_resMIXED,rr_resUP,rr_resDN, file= paste(RData_dir,"romer_rr_res.RData",  sep=""))
+```
+
+
+End of Question 2 & 3
+_________________________
+
+
+(4) Do an exon-level differential splicing analysis using limma.
+
+```{r}
+
+ss_1 <- read.delim("hw2_exp_design.tsv")
+
+load("HW2_mouse_brain_RNAseq_exonlevel_counts.Rdata")
+
+Exon_level_counts <- counts
+
+dge_Exon_level <- DGEList(counts=Exon_level_counts, genes=gene_annotation)
+
+isexpr_Exon_level <- rowSums(dge_Exon_level$counts > 50) >=3
+
+sum(isexpr_Exon_level)/nrow(dge_Exon_level)
+
+dge_Exon_level <- dge_Exon_level[isexpr_Exon_level,,keep.lib.sizes=FALSE]
+
+dim(dge_Exon_level)
+
+dge_Exon_level <- calcNormFactors(dge_Exon_level)
+
+design_Exon_level <- model.matrix(~stressor, data=ss_1)
+
+v <- voom(dge_Exon_level,design_Exon_level,plot=TRUE)
+
+fit_Exon_level <- lmFit(v,design_Exon_level)
+
+fit2_Exon_level  <- eBayes(fit_Exon_level)
+
+colnames(fit2_Exon_level)
+```
+
+
+```{r}
+fit3_splice <- diffSplice(fit2_Exon_level, geneid="GeneID")
+
+colnames(fit3_splice) # show the column names of comparisons
+
+```
+
+
+
+
+(5) Generate exon plots for the top 5 genes showing statistical evidence of alternative splicing. Save as  "splicing_plots_NETID.pdf".
+
+```{r}
+
+
+FC_splice = topSplice(fit3_splice, coef="stressorNS", number=nrow(dge_Exon_level$counts))
+
+pdf(file = "splicing_plots_yr542.pdf")
+
+for (i in 1:5) {
+plotSplice(fit3_splice, coef="stressorNS", geneid=FC_splice$GeneID[i])
+}
+dev.off()
+
+FC_splice = FC_splice[with(FC_splice, order(FDR, P.Value)), ]
+FC_splice = FC_splice[FC_splice$FDR <= 0.10,]
+dim(FC_splice)
+
+RData_dir = "./" 
+save(fit3_splice, FC_splice, file=paste(RData_dir,"Question4_HW_4.RData",  sep=""))
+
+
+```
+
+(6) Comment on the experimental design in this home work, in particular what do you think of the use of technical replicates compared with using the sequencing capacity to do additional biological replicates?
+
+I think that technical replicates can be useful however, I could not use this. It would have made it more likely to find certain genes that are statistically significant. I tried to sum up the _1 and _2 columns but I failed to do this. 
+
+```{r}
+# Counts_Transformed <- as.data.frame(counts)
+# 
+# # Used this url for the following: https://stackoverflow.com/questions/29511215/convert-row-names-into-first-column?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+# 
+# library(data.table)
+# Counts_Transformed <- setDT(Counts_Transformed, keep.rownames = TRUE)[]
+# 
+# # Used the following url to sum up rows per column: https://stackoverflow.com/questions/26046776/sum-two-columns-in-r?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+# 
+# 
+# 
+# counts$SRR1313333 <- counts$SRR1313333_sorted_1.bam * 2  
+# counts$SRR1313334 <- counts$SRR1313334_sorted_1.bam + counts$SRR1313334_sorted_2.bam  
+# counts$SRR1313335 <- counts$SRR1313335_sorted_1.bam + counts$SRR1313335_sorted_2.bam  
+# counts$SRR1313336 <- counts$SRR1313336_sorted_1.bam + counts$SRR1313336_sorted_2.bam  
+# counts$SRR1313337 <- counts$SRR1313337_sorted_1.bam + counts$SRR1313337_sorted_2.bam  
+# counts$SRR1313338 <- counts$SRR1313338_sorted_1.bam + counts$SRR1313338_sorted_2.bam  
+# counts$SRR1313339 <- counts$SRR1313339_sorted_1.bam + counts$SRR1313339_sorted_2.bam  
+# counts$SRR1313340 <- counts$SRR1313340_sorted_1.bam + counts$SRR1313340_sorted_2.bam 
+# 
+# Counts_Transformed$SRR1313333 <- Counts_Transformed$SRR1313333_sorted_1.bam + Counts_Transformed$SRR1313333_sorted_2.bam  
+# Counts_Transformed$SRR1313334 <- Counts_Transformed$SRR1313334_sorted_1.bam + Counts_Transformed$SRR1313334_sorted_2.bam  
+# Counts_Transformed$SRR1313335 <- Counts_Transformed$SRR1313335_sorted_1.bam + Counts_Transformed$SRR1313335_sorted_2.bam  
+# Counts_Transformed$SRR1313336 <- Counts_Transformed$SRR1313336_sorted_1.bam + Counts_Transformed$SRR1313336_sorted_2.bam  
+# Counts_Transformed$SRR1313337 <- Counts_Transformed$SRR1313337_sorted_1.bam + Counts_Transformed$SRR1313337_sorted_2.bam  
+# Counts_Transformed$SRR1313338 <- Counts_Transformed$SRR1313338_sorted_1.bam + Counts_Transformed$SRR1313338_sorted_2.bam  
+# Counts_Transformed$SRR1313339 <- Counts_Transformed$SRR1313339_sorted_1.bam + Counts_Transformed$SRR1313339_sorted_2.bam  
+# Counts_Transformed$SRR1313340 <- Counts_Transformed$SRR1313340_sorted_1.bam + Counts_Transformed$SRR1313340_sorted_2.bam 
+# 
+# 
+# # Refered to this for the following command : https://dzone.com/articles/learn-r-how-create-data-frames
+# 
+# New_DF <- data.frame(Counts_Transformed$rn, Counts_Transformed$SRR1313333, Counts_Transformed$SRR1313334, Counts_Transformed$SRR1313335, Counts_Transformed$SRR1313336, Counts_Transformed$SRR1313337, Counts_Transformed$SRR1313338, Counts_Transformed$SRR1313339, Counts_Transformed$SRR1313340)
+# 
+# New_DF_1 <- New_DF
+# names(New_DF_1) <- c("rn", "SRR1313333" , "SRR1313334" , "SRR1313335" , "SRR1313336" , "SRR1313337" , "SRR1313338" , "SRR1313339" , "SRR1313340")
+# 
+# a <- counts[,0]
+# 
+# DF_New <- as.matrix(New_DF,counts[,0]) 
+# New_DF_2 <- data.matrix(New_DF_1, rownames.force = TRUE)
+
+```
+Refered to:
+
+http://chagall.med.cornell.edu/RNASEQcourse/Intro2RNAseq.pdf
+
+https://stackoverflow.com/questions/29511215/convert-row-names-into-first-column
+Used this to convert the row names into the first column
+
+https://stackoverflow.com/questions/33322248/how-to-import-tsv-file-in-r
+Used to figure out how to bring in a .tsv file
