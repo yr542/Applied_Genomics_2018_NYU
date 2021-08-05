@@ -1,6 +1,6 @@
 ---
 title: "Assignment_4"
-author: "Yasmin Rajendran"
+author: "yr542"
 date: "March 29, 2018"
 output: html_document
 ---
