@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:30:00
+#SBATCH --mem 30GB 
+
+#Go to directory
+
+cd $SCRATCH/Homework01
+
+module load fastqc/0.11.5
+
+fastqc cdg21c1_R1.fastq
