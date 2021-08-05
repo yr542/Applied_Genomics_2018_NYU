@@ -1,0 +1,102 @@
+
+
+## I did not do the homework questions in numerical order.
+##This part was done in command line and then copied into a Notepad ++ document.
+
+#########Question(s):
+
+### 1. Create a directory called Homework01 in your scratch directory and copy the three files there.
+## The hashtags are comments the commands do not have hashtags on it.
+## First I have to go to the SCRATCH Directory
+cd $SCRATCH
+## Make a directory called Homework01
+mkdir Homework01
+##Copy the files needed into the folder
+cp /scratch/courses/AppliedGenomics2018/Homework01/cdg21c1_R1.fastq .
+#Move the file to Homework01
+mv cdg21c1_R1.fastq Homework01
+#Copy the file of interest
+cp /scratch/courses/AppliedGenomics2018/Homework01/Scer3.fa .
+#Move it
+mv Scer3.fa Homework01
+#Go to where you want
+cd $SCRATCH/Homework01
+#Check
+pwd
+ls
+#Copy the file of interest
+cp /scratch/courses/AppliedGenomics2018/Homework01/Scer3.gff .
+##Checking everything is in the file
+ls
+
+
+### 2.  How many sequences are provided in the Scer3.fa file and what are their names?
+
+## From the Scer.fa file I found 17 sequences.I used the following code.
+##I made a directory. I had already made a Q2 directory and cd commanded into it.
+mkdir Attempt6
+## I went into it
+cd $SCRATCH/Homework01/Q2/Attempt6
+## I copied the Scer3.fa file into it
+cp $SCRATCH/Homework01/Q2/Scer3.fa $SCRATCH/Homework01/Q2/Attempt6
+## This code split the file based on the ">" symbol being there at the beginning of each sequence label.
+csplit -k Scer3.fa '/^>/' {*}
+## I checked each file manually and copied down the label of the sequence.
+nano xx00
+nano xx01
+nano xx02
+nano xx03
+nano xx04
+nano xx05
+nano xx06
+nano xx07
+nano xx08
+nano xx09
+nano xx10
+nano xx11
+nano xx12
+nano xx13
+nano xx14
+nano xx15
+nano xx16
+nano xx17
+## I found 17 sequence labels.
+##Their names were/are chr1, chrII, chrIII, chrIV, chrV, chrVI, chrVII,chrVIII,chrIX, chrX,chrXI,chrXII,chrXIII,chrXIV, chrXV,chrXVI & chrM.
+
+
+### 3. How many genes are annotated in the Scer3.gff file? 
+
+awk '{print $3}' Scer3.gff > forcedawkintotextfile.txt
+
+##If you are looking for the number of mention of genes.
+grep -o -c gene forcedawkintotextfile.txt
+##The above command selected for the lines that match the word given above "gene".
+## The number of genes in the file (outputted by the program) is 6716.
+
+
+
+### 4. How many different features are provided in the Scer3.gff file?
+
+## The meaning of features is unclear here. If it means the labels for the types of genetic information they found the following commands were useful.
+
+sort -u forcedawkintotextfile.txt > sortedFILEawkCommand.txt
+##Above I sorted for what is unique.
+wc -l sortedFILEawkCommand.txt
+##Above I counted the number of lines.
+
+##There are 36 different features that are mentioned in this file. 
+
+
+
+Refered to:
+https://en.wikipedia.org/wiki/Ls
+https://en.wikipedia.org/wiki/Cd_(command)
+https://en.wikipedia.org/wiki/Mv
+https://en.wikipedia.org/wiki/Move_(command)
+https://likegeeks.com/awk-command/ <- Used to understand awk command
+https://askubuntu.com/questions/420981/how-do-i-save-terminal-output-to-a-file <- Used to shunt the output of the awk command into a txt file
+https://unix.stackexchange.com/questions/2244/how-do-i-count-the-number-of-occurrences-of-a-word-in-a-text-file-with-the-comma <- used to find the number of genes
+https://askubuntu.com/questions/442914/calculating-the-number-of-lines-in-a-file <- used to find the number of lines in a file
+http://www.lostsaloon.com/technology/how-to-split-a-file-into-multiple-files-in-linux/ <- used to understand the csplit command
+
+
