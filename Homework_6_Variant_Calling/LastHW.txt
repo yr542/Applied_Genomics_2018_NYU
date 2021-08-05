@@ -1,0 +1,160 @@
+Applied Genomics 2018
+Homework 06 - Variant Calling
+Due: May 7th, 11:59pm
+
+The Experiment:
+
+Mutation in the PTC (phenylthiocarbamide) gene is known to be associated to the ability to taste the bitterness of PTC. 75% of the population have the ability to taste PTC and 25% are “non-tasters”. Evolutionarily this maybe important because many chemicals that are similar to PTC can be toxic. Whereas there are aso chemicals such as Isothiocyanates and goitrin that are found in nutritional food such as broccoli, cabbage, and brussel sprouts.
+
+5 individuals were given the the taste test and the sequence of just part of the PTC gene was sequenced. Your task is to identify SNPs in the data of high confidence.
+
+Files are located in /scratch/courses/AppliedGenomics2018/HomeworkSNPs
+
+
+    1. Align the five Sample sequences using BWA. Do not align it to the whole human genome. Use the PTC_Human.fa
+	
+	Notes are made after #
+	
+	cd $SCRATCH
+	mkdir Last_Applied_Genomics_HW
+	cd $SCRATCH/Last_Applied_Genomics_HW
+	cp /scratch/courses/AppliedGenomics2018/HomeworkSNPs/* . # Copy files
+	ls
+	srun --mem 20GB --cpus-per-task 1 --pty /bin/bash # Get on an interactive node
+	
+	# Modules
+	
+	module purge
+	module load bwa/intel/0.7.15
+	module load picard/2.8.2
+	module load samtools/intel/1.6
+	module load gatk/3.8-0
+	
+	# Alignment
+	
+	bwa index PTC_Human.fa
+	ls -l
+	ls
+	bwa mem -M PTC_Human.fa Sample1_GandG2015.fastq > aligned_reads_Sample_1.sam	
+	bwa mem -M PTC_Human.fa Sample2_GandG2015.fastq > aligned_reads_Sample_2.sam
+	bwa mem -M PTC_Human.fa Sample3_GandG2015.fastq > aligned_reads_Sample_3.sam
+	bwa mem -M PTC_Human.fa Sample4_GandG2015.fastq > aligned_reads_Sample_4.sam
+	bwa mem -M PTC_Human.fa Sample5_GandG2015.fastq > aligned_reads_Sample_5.sam
+
+	
+
+    2. Sort the BAM files
+        a. In Picard tools use SortSam
+		
+			java -jar $PICARD_JAR SortSam INPUT=aligned_reads_Sample_1.sam OUTPUT=sorted_reads_Sample_1.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=aligned_reads_Sample_2.sam OUTPUT=sorted_reads_Sample_2.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=aligned_reads_Sample_3.sam OUTPUT=sorted_reads_Sample_3.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=aligned_reads_Sample_4.sam OUTPUT=sorted_reads_Sample_4.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=aligned_reads_Sample_5.sam OUTPUT=sorted_reads_Sample_5.bam SORT_ORDER=coordinate
+
+
+    3. Add read groups. For each sample add a different sample name for the read groups. You can use Sample1, Sample2, etc.
+        a. In Picard tools use AddOrReplaceReadGroups
+			
+			java -jar $PICARD_JAR AddOrReplaceReadGroups I=sorted_reads_Sample_1.bam O=sorted_reads_Sample_1_AORRG.bam RGID=4 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=20
+			java -jar $PICARD_JAR AddOrReplaceReadGroups I=sorted_reads_Sample_2.bam O=sorted_reads_Sample_2_AORRG.bam RGID=4 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=20
+			java -jar $PICARD_JAR AddOrReplaceReadGroups I=sorted_reads_Sample_3.bam O=sorted_reads_Sample_3_AORRG.bam RGID=4 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=20
+			java -jar $PICARD_JAR AddOrReplaceReadGroups I=sorted_reads_Sample_4.bam O=sorted_reads_Sample_4_AORRG.bam RGID=4 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=20
+			java -jar $PICARD_JAR AddOrReplaceReadGroups I=sorted_reads_Sample_5.bam O=sorted_reads_Sample_5_AORRG.bam RGID=4 RGLB=lib1 RGPL=illumina RGPU=unit1 RGSM=20
+
+    4. Mark the duplicates
+        a. In Picard Tools use MarkDuplicates
+		
+			java -jar $PICARD_JAR MarkDuplicates INPUT=sorted_reads_Sample_1_AORRG.bam OUTPUT=dedup_reads_Sample_1.bam METRICS_FILE=metrics_Sample_1.txt
+			java -jar $PICARD_JAR MarkDuplicates INPUT=sorted_reads_Sample_2_AORRG.bam OUTPUT=dedup_reads_Sample_2.bam METRICS_FILE=metrics_Sample_2.txt
+			java -jar $PICARD_JAR MarkDuplicates INPUT=sorted_reads_Sample_3_AORRG.bam OUTPUT=dedup_reads_Sample_3.bam METRICS_FILE=metrics_Sample_3.txt
+			java -jar $PICARD_JAR MarkDuplicates INPUT=sorted_reads_Sample_4_AORRG.bam OUTPUT=dedup_reads_Sample_4.bam METRICS_FILE=metrics_Sample_4.txt
+			java -jar $PICARD_JAR MarkDuplicates INPUT=sorted_reads_Sample_5_AORRG.bam OUTPUT=dedup_reads_Sample_5.bam METRICS_FILE=metrics_Sample_5.txt
+
+    5. Realign the gaps. 
+        a. First make sure the bam files are sorted using SortSam
+		
+			java -jar $PICARD_JAR SortSam INPUT=dedup_reads_Sample_1.bam OUTPUT=sorted_dedup_reads_Sample_1.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=dedup_reads_Sample_2.bam OUTPUT=sorted_dedup_reads_Sample_2.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=dedup_reads_Sample_3.bam OUTPUT=sorted_dedup_reads_Sample_3.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=dedup_reads_Sample_4.bam OUTPUT=sorted_dedup_reads_Sample_4.bam SORT_ORDER=coordinate
+			java -jar $PICARD_JAR SortSam INPUT=dedup_reads_Sample_5.bam OUTPUT=sorted_dedup_reads_Sample_5.bam SORT_ORDER=coordinate
+			
+        b. You will also need index files usign BuildBamIndex from Picard Tools.
+			
+			java -jar $PICARD_JAR BuildBamIndex I=sorted_dedup_reads_Sample_1.bam
+			java -jar $PICARD_JAR BuildBamIndex I=sorted_dedup_reads_Sample_2.bam
+			java -jar $PICARD_JAR BuildBamIndex I=sorted_dedup_reads_Sample_3.bam
+			java -jar $PICARD_JAR BuildBamIndex I=sorted_dedup_reads_Sample_4.bam
+			java -jar $PICARD_JAR BuildBamIndex I=sorted_dedup_reads_Sample_5.bam
+			
+			# Referred to: https://software.broadinstitute.org/gatk/documentation/tooldocs/current/picard_sam_BuildBamIndex.php
+		
+        c. Then, in the GATK package, use the tools RealignerTargetCreator and IndelRealigner
+			
+			java -jar $PICARD_JAR CreateSequenceDictionary R=PTC_Human.fa O=PTC_Human.fa.dict
+			samtools faidx PTC_Human.fa
+			samtools faidx PTC_Human.dict
+			
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T RealignerTargetCreator -R PTC_Human.fa -I sorted_dedup_reads_Sample_1.bam -o realigned_Sample_1.intervals
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T RealignerTargetCreator -R PTC_Human.fa -I sorted_dedup_reads_Sample_2.bam -o realigned_Sample_2.intervals
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T RealignerTargetCreator -R PTC_Human.fa -I sorted_dedup_reads_Sample_3.bam -o realigned_Sample_3.intervals
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T RealignerTargetCreator -R PTC_Human.fa -I sorted_dedup_reads_Sample_4.bam -o realigned_Sample_4.intervals
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T RealignerTargetCreator -R PTC_Human.fa -I sorted_dedup_reads_Sample_5.bam -o realigned_Sample_5.intervals
+			
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T IndelRealigner -R PTC_Human.fa -I sorted_dedup_reads_Sample_1.bam -targetIntervals realigned_Sample_1.intervals -o realignedBam_Sample_1.bam
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T IndelRealigner -R PTC_Human.fa -I sorted_dedup_reads_Sample_2.bam -targetIntervals realigned_Sample_2.intervals -o realignedBam_Sample_2.bam
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T IndelRealigner -R PTC_Human.fa -I sorted_dedup_reads_Sample_3.bam -targetIntervals realigned_Sample_3.intervals -o realignedBam_Sample_3.bam
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T IndelRealigner -R PTC_Human.fa -I sorted_dedup_reads_Sample_4.bam -targetIntervals realigned_Sample_4.intervals -o realignedBam_Sample_4.bam
+			java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T IndelRealigner -R PTC_Human.fa -I sorted_dedup_reads_Sample_5.bam -targetIntervals realigned_Sample_5.intervals -o realignedBam_Sample_5.bam
+			
+    7. Sort and Index the merged file using SortSam and BuildBamIndex as above.
+	
+		java -jar $PICARD_JAR SortSam INPUT=realignedBam_Sample_1.bam OUTPUT=sorted_realignedBam_Sample_1.bam SORT_ORDER=coordinate
+		java -jar $PICARD_JAR SortSam INPUT=realignedBam_Sample_2.bam OUTPUT=sorted_realignedBam_Sample_2.bam SORT_ORDER=coordinate
+		java -jar $PICARD_JAR SortSam INPUT=realignedBam_Sample_3.bam OUTPUT=sorted_realignedBam_Sample_3.bam SORT_ORDER=coordinate
+		java -jar $PICARD_JAR SortSam INPUT=realignedBam_Sample_4.bam OUTPUT=sorted_realignedBam_Sample_4.bam SORT_ORDER=coordinate
+		java -jar $PICARD_JAR SortSam INPUT=realignedBam_Sample_5.bam OUTPUT=sorted_realignedBam_Sample_5.bam SORT_ORDER=coordinate
+		
+		java -jar $PICARD_JAR BuildBamIndex I=sorted_realignedBam_Sample_1.bam
+		java -jar $PICARD_JAR BuildBamIndex I=sorted_realignedBam_Sample_2.bam
+		java -jar $PICARD_JAR BuildBamIndex I=sorted_realignedBam_Sample_3.bam
+		java -jar $PICARD_JAR BuildBamIndex I=sorted_realignedBam_Sample_4.bam
+		java -jar $PICARD_JAR BuildBamIndex I=sorted_realignedBam_Sample_5.bam
+		
+    8. Run GATK using the UnifiedGenotyper
+	
+	java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T UnifiedGenotyper -R PTC_Human.fa -I sorted_realignedBam_Sample_1.bam -I sorted_realignedBam_Sample_2.bam -I sorted_realignedBam_Sample_3.bam -I sorted_realignedBam_Sample_4.bam -I sorted_realignedBam_Sample_5.bam -L realigned_Sample_1.intervals -L realigned_Sample_2.intervals -L realigned_Sample_3.intervals -L realigned_Sample_4.intervals -L realigned_Sample_5.intervals -o snps.raw.vcf 
+	
+	# Referred to: https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_genotyper_UnifiedGenotyper.php
+
+    9. Filter the VCF file using VariantFiltration.
+        a.    Filter using the following expression:
+        b.  --filterExpression "QD<2.0||MQ<40.0||FS>60.0||HaplotypeScore>13.0"
+	
+	java -jar /share/apps/gatk/3.7-0/GenomeAnalysisTK.jar -T VariantFiltration -R PTC_Human.fa --variant snps.raw.vcf --filterExpression "QD<2.0||MQ<40.0||FS>60.0||HaplotypeScore>13.0" -o output_1.vcf --filterName "Genotype Quality"
+		
+	# Referred to: https://software.broadinstitute.org/gatk/documentation/tooldocs/3.8-0/org_broadinstitute_gatk_tools_walkers_filters_VariantFiltration.php
+
+    10. Index the filtered VCF file using igvtools.
+	
+        a. You will need this for IGV
+		
+		module avail igv
+		module load igvtools/2.3.91
+		igvtools index output_1.vcf
+		
+		Referred to: http://software.broadinstitute.org/software/igv/?q=book/export/html/72
+
+    11. Load the files in IGV and take a screen shot of the SNPs
+	
+		scp yr542@prince.hpc.nyu.edu:/scratch/yr542/Last_Applied_Genomics_HW/output_1.vc* /home/mobaxterm/Desktop
+		
+		- I cannot figure this out. 
+		
+		# I refered to the learn.gencore site all throughout. 
+
+**NOTE** Most of the steps above were discussed in class. I have provided the name of the tools/functions in the different toolkits to help you run the different steps. It is a good idea to look at the documentation of the different tools to make sure you are using it correctly.
+
+The files are small, so the steps should not take very long.
+
