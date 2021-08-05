@@ -1,0 +1,8 @@
+Grade: 85.00 (max 100.00)
+
+
+Additional instructor's comments about your submission:
+
+(-10) Technical replicates were incorrectly treated as biological replicates. Counts of technical replicates should be summed.
+
+Q6 - (-5) Increasing biological replicates provides better power since biological variance is greater than technical Poisson variance.
