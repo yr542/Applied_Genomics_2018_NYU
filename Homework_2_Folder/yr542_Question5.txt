@@ -1,0 +1,29 @@
+
+
+5)Calculate Read Counts. 
+Use the R packages ( RSamtools, GenomicFeatures and GenomicAlignments) to count the number of reads that are matching the different genes.
+
+a)How many genes have no reads mapping across all samples ?
+
+Only 2 genes (AT1G01030 & AT1G01046) has no reads mapping across all samples.
+
+b)Which gene has the highest total number of reads?
+
+AT1G01100 has the highest total number of reads.
+
+c)What is the total number of mapped reads per sample?
+
+SRR3347441 - 15
+SRR3347442 - 20
+SRR3347443 - 22
+SRR3347444 - 22
+SRR3347445 - 21
+SRR3347446 - 27
+SRR3347447 - 32
+SRR3347448 - 21
+SRR3347449 - 30
+SRR3347450 - 32
+SRR3347451 - 31
+SRR3347452 - 25
+
+
