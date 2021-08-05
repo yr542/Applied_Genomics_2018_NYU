@@ -1,0 +1,13 @@
+Grade: 96.00 (max 100.00)
+
+Additional instructor's comments about your submission:
+
+Part 1. (-4) Your command also counted features like "pseudogene".
+
+Interesting use of csplit. This is probably an easier way:
+
+grep ">" Scer3.fa | wc -l
+
+grep counts the number of times ">" appears in the file, and you pipe that to wc with the -l option (which counts the number of lines it occurs).
+
+Well done.
