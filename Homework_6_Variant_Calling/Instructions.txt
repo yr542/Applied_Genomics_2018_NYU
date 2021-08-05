@@ -1,0 +1,62 @@
+Applied Genomics 2018
+Homework 06 - Variant Calling
+Due: May 7th, 11:59pm
+
+
+The Experiment:
+
+
+Mutation in the PTC (phenylthiocarbamide) gene is known to be associated to the ability to taste the bitterness of PTC. 75% of the population have the ability to taste PTC and 25% are “non-tasters”. Evolutionarily this maybe important because many chemicals that are similar to PTC can be toxic. Whereas there are aso chemicals such as Isothiocyanates and goitrin that are found in nutritional food such as broccoli, cabbage, and brussel sprouts.
+
+
+5 individuals were given the the taste test and the sequence of just part of the PTC gene was sequenced. Your task is to identify SNPs in the data of high confidence.
+
+
+Files are located in /scratch/courses/AppliedGenomics2018/HomeworkSNPs/
+
+
+1. Align the five Sample sequences using BWA. Do not align it to the whole human genome. Use the PTC_Human.fa
+
+
+2. Sort the BAM files
+   1. In Picard tools use SortSam
+
+
+3. Add read groups. For each sample add a different sample name for the read groups. You can use Sample1, Sample2, etc.
+   1. In Picard tools use AddOrReplaceReadGroups
+
+
+4. Mark the duplicates
+   1. In Picard Tools use MarkDuplicates
+
+
+5. Realign the gaps. 
+   1. First make sure the bam files are sorted using SortSam
+   2. You will also need index files usign BuildBamIndex from Picard Tools.
+   3. Then, in the GATK package, use the tools RealignerTargetCreator and IndelRealigner
+6. Merge the BAM files into one BAM file.
+   1. Use MergeSamFiles from Picard tools
+
+
+7. Sort and Index the merged file using SortSam and BuildBamIndex as above.
+
+
+8. Run GATK using the UnifiedGenotyper
+
+
+9. Filter the VCF file using VariantFiltration.
+   1.    Filter using the following expression:
+   2.  --filterExpression "QD<2.0||MQ<40.0||FS>60.0||HaplotypeScore>13.0" 
+
+
+10. Index the filtered VCF file using igvtools.
+   1. You will need this for IGV
+
+
+11. Load the files in IGV and take a screen shot of the SNPs
+
+
+**NOTE** Most of the steps above were discussed in class. I have provided the name of the tools/functions in the different toolkits to help you run the different steps. It is a good idea to look at the documentation of the different tools to make sure you are using it correctly.
+
+
+The files are small, so the steps should not take very long.
