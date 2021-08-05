@@ -1,0 +1,106 @@
+---
+title: "Homework03_Final_Due_03_07_2018"
+author: "Yasmin Rajendran"
+date: "March 7, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, results='hide', message=FALSE, warning=FALSE}
+library(edgeR)
+library(limma)
+library(dplyr)
+```
+
+## Question 1
+
+###Q1.An RData file is provided which has the raw counts and gene lengths (length of CDS) for the arabidopsis data used in the RNA-seq lab. Write an R function to compute the TPM expression level of each gene. 
+
+
+```{r}
+FILE = load(file ="RNAseq_arabidopsis_genelevel_counts_length.RData") # One of the data files
+```
+
+
+```{r Q1_Calculating_TPM}
+TPMFunction <- function(x) {
+C_1 <- counts
+  for (i in 1:ncol(counts)) {
+    Counts_1 <- as.data.frame(counts)
+    glength_1 <-as.data.frame(glength)
+    Store_Counts_Column <- Counts_1 [,i]
+    length(Store_Counts_Column)
+    Store_glength_gene_length <- glength_1[,"Length"]
+    # "1.  Divide the read counts by the length if each gene in kilobases. This gives you reads per kilobase (RPK)." (from lecture)
+    Step1_RPK <- Store_Counts_Column / (Store_glength_gene_length/1000)
+    # "2.  Count up all the RPK values in a sample and divide this number by 1,000,000. This is your "per million" scaling factor." (from lecture)
+    Step2_Scaling_Factor <- sum(Step1_RPK) / 1000000
+    # "3.  Divide the RPK values by the "per million" scaling factor. This gives you TPM"
+    Step3_TPM <- Step1_RPK / Step2_Scaling_Factor
+    C_1[,i] <- Step3_TPM
+  }
+
+  return(C_1)
+ 
+  }
+
+#Testing out the function
+y = TPMFunction(FILE)
+head(y) 
+```
+
+*I modified this question so that it was split into more than one part. I have not modified what the question is asking.*
+
+
+___
+
+## Question 2
+
+###Q2. Counts for a simulated small RNA-seq dataset are provided in "smallRNA_simulated.RData". 
+
+
+
+###Matrix A stores the counts over 1000 microRNAs (rows), in two conditions (columns). Biologically, the microRNA expression is identical in the two conditions except the first microRNA which has a drastically increased expression under the condition 1. **Note that the total read counts for each column is the same (1E6 reads) representing the fixed sequencing capacity of the high-throughput sequencing assay used.** 
+
+
+
+
+
+####a) By reference to the paper Robinson, M. and Oshlack, A. "A scaling normalization method for differential expression analysis of RNA-seq data" (in readings in classes), describe the "real-estate effect" and why the expression of most microRNAs appear to be different between the two conditions in the unnormalised raw data given. 
+
+
+**Answer:** *The real estate effect seems to suggest that if there are genes that seemed to be expressed a lot the ones that are less expressed tend to be seen less in the data collected. Therefore, there needs to be some adjustment post collect for this in order to see anything of value in the sample data. This is why people use TMM normalization. That is why expression seems to differ slightly between the 2 columns, however, with normalization it should look similar.* 
+
+
+
+
+####b) Apply a TMM normalization to the data and compare the expression levels after. Did it improve the normalization, given the biological assumption that most microRNAs had similar expression between conditions? 
+
+**Answer:* *It seemed to improve it. You can view it below. The expression was similar between conditions.*
+
+
+```{r }
+Load_Q2 <- load("smallRNA_simulated.RData")
+
+Trying_Calc_Norm_Factors <- calcNormFactors(A , method="TMM")
+
+DF_Calc_norm_Factors <- as.data.frame(Trying_Calc_Norm_Factors)
+
+DF_1 <- DF_Calc_norm_Factors
+
+Column_1_New <- as.data.frame(list(Column_1_answer = DF_1[1,1] / A[,1])) 
+Column_2_New <- as.data.frame(list(Column_2_answer = DF_1[2,1] / A[,2]))
+
+New_DF_Q2 <- merge ( Column_1_New, Column_2_New )
+
+head(New_DF_Q2)
+```
+
+___
+
+## Question 3
+
+*This is in another R Markdown document.*

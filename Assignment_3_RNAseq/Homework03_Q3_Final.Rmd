@@ -1,0 +1,252 @@
+---
+title: "RNA-seq limma example"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install needed packages the first time only
+```{r}
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("limma")
+#biocLite("edgeR")
+#install.packages("dplyr")
+#install.packages("WriteXLS")
+# (Note: under Windows will also need to install Perl)
+```
+
+## Load libraries
+```{r}
+library("dplyr")  # for arrange() function
+library(limma)    # main limma package
+library(edgeR)    # we need the TMM function from edgeR
+library(WriteXLS) # for convenience, we will save the final results as an Excel file
+```
+
+
+
+## Load raw data
+This is the RNA-seq counts per gene. This was calculated using featureCounts. Also load sample information (stored in data.frame "ss")
+
+```{r}
+load(file=paste("RNAseq_arabidopsis_genelevel_counts.RData",sep=""))
+
+ss <- read.delim("experiment_info.tsv")
+```
+
+Look at the raw count data saved from featureCounts
+```{r}
+colnames(counts)
+dim(counts)
+ss   # labels of samples (this needs to have the predictors corresponding to each bam filename)
+
+genelevel_counts <- counts
+```
+
+Convert counts from standard R list to Bioconductor DGEList data structure
+```{r}
+dge <- DGEList(counts=genelevel_counts)
+```
+
+## Non-specific filter to remove low count features 
+##### (Y.R. This chunk below is one way to deal with biological noise and therefore is partially helping to mitigate HTS issue 1 Poisson count noise)
+```{r}
+# (requires > 1 CPM over at least 3 samples)
+#isexpr <- rowSums(cpm(dge) > 1) >=3  # require a minimum counts per million
+isexpr <- rowSums(dge$counts > 50) >=3  # or we can specify a minimum count
+
+# Check what fraction of genes remain
+sum(isexpr)/nrow(dge)
+
+# Remove low expressed genes.
+dge <- dge[isexpr,,keep.lib.sizes=FALSE] # keep.lib.sizes=FALSE to force recalculating library sizes from sums of column counts (note: we can also pass in library sizes explicitly)
+
+dim(dge)
+```
+
+
+## TMM normalization 
+#####(Y.R. This chunk below is a way to deal with HTS issue (3) Normalisation. )
+```{r}
+dge <- calcNormFactors(dge)
+```
+
+## Calculate design matrix 
+(this also works with base R) 
+(using default treatment contrasts for this example)
+
+Note: no need to specify the response variable here, so we leave it out.
+
+Note: I use the column "genotype" to indicate MT knockout vs WT, and "stressor" to indicate oxidative stress or no stress.
+
+```{r}
+design <- model.matrix(~stressor*genotype, data=ss)
+```
+
+Note: this design matrix uses the default R "treatment contrasts" so the columns 1 to 4 represent:
+1. "(Intercept)" is mean WT unstressed
+2. "stressorstress_Root" is WT stressed - WT unstressed
+3. "genotypemt" is MT knockout unstressed - WT unstressed
+4. "stressorstress_Root:genotypemt" is interaction term
+
+Note that the contrast "stressed versus unstressed MT knockout" is *not* available
+
+## Calculate weights to correct for Poisson count noise due to discrete nature of RNA-seq. 
+This is done by empirically fitting a curve to (and also log converts).
+This allows us to use a weighted linear model rather than requiring a more complex generalized linear model of a negative binomial distribution.
+
+#### YR: This seems to help with (1) Poisson count noise.
+
+```{r}
+v <- voom(dge,design,plot=TRUE) # Note: optionally, we can pass library sizes explicity here
+```
+
+## Fit linear models across all genes using lmFit 
+(like lm() in base R)
+```{r}
+fit <- lmFit(v,design)
+```
+
+## eBayes computes F (overall "omnibus" p-values) and (moderated) t-statistics for all genes
+(like anova() in base R)
+
+####(Y.R. This chunk below is a way to deal with HTS issue (2) Moderated t-test)
+```{r}
+fit2  <- eBayes(fit)
+colnames(fit2)
+```
+## Do FDR multiple testing correction and extract list of most significant genes (using Benjamini-Hockberg by default)
+
+#### (Y.R. This chunk is a way of dealing with HTS issue (4) Multiple testing correction becuase it deals with calculation of the FDR)
+```{r}
+R_interaction = topTable(fit2, coef="stressorstress_Root:genotypeWT", number=nrow(dge$counts)) 
+R_stress_vs_ctrl_in_WT = topTable(fit2, coef="stressorstress_Root", number=nrow(dge$counts))
+R_mt_vs_WT_in_ctrl = topTable(fit2, coef="genotypeWT", number=nrow(dge$counts))
+```
+## How many significant genes showing interaction are there at FDR of 5% ?
+```{r}
+dim(R_interaction[R_interaction$adj.P.Val <= 0.05,])
+head(R_interaction)
+```
+
+## Set a contrast matrix that specifies directly the contrasts we are interested in.
+The above analysis used the default "treatment contrasts" of R as specied by the design matrix. However, that does not give us the oxidative stress vs unstressed in MT knockout contrast which we may be interested in, but we can get that using custom contrasts (see Crawley- The R Book 1 ed p371 for a full example in base R)
+
+#### (Y.R. This will give a linear fit and therefore, it deals with HTS issue (1) Poisson count noise)
+```{r}
+cont.matrix <- cbind(stress_vs_ctrl_in_WT=c(0,1,0,0),stress_vs_ctrl_in_mt=c(0,1,0,1),interaction=c(0,0,0,1))
+
+fit3 <- contrasts.fit(fit, cont.matrix)	# like contrasts() in base R
+
+colnames(fit3)
+```
+
+## Compute F and (moderated) t-statistics for all genes
+####(Y.R. This chunk below is a way to deal with HTS issue (2) Moderated t-test)
+```{r}
+fit3  <- eBayes(fit3)
+```
+
+## Get top ranked genes
+
+#### (Y.R. THis chunk below is a way to deal with HTS issue (4) Multiple testing correction)
+```{r}
+R_interaction2 = topTable(fit3, coef="interaction", number=nrow(dge$counts),adjust.method="BH")
+R_stress_ctrl_WT = topTable(fit3, coef="stress_vs_ctrl_in_WT", number=nrow(dge$counts),adjust.method="BH")
+R_stress_ctrl_mt = topTable(fit3, coef="stress_vs_ctrl_in_mt", number=nrow(dge$counts),adjust.method="BH")
+```
+
+## Optionally, save results in Excel format.
+```{r}
+# make list of data.frames to write to xls file
+sigGenes = list()
+sigGenes[["R_interaction2"]] = R_interaction2
+sigGenes[["R_stress_ctrl_WT"]] =R_mt_vs_WT_in_ctrl
+sigGenes[["R_stress_ctrl_mt"]] =R_stress_ctrl_mt
+
+sigGenes_fdr05 = lapply(sigGenes, function(x) x[x[,"adj.P.Val"]<=0.05,])  # limit to FDR of 0.05
+
+# print number of significant genes
+lapply( sigGenes_fdr05, nrow)
+
+# write out results in Excel format
+WriteXLS("sigGenes_fdr05",ExcelFileName=paste("expression_genelevel_limma_example.xls",  sep=""),row.names=T, FreezeRow=1,FreezeCol=1,AdjWidth=F)	
+```
+
+## Generate coomon plots for exploratory data analysis
+```{r}
+volcanoplot(fit3, coef="stress_vs_ctrl_in_WT")
+plotMD(fit3, main="plotMD(fit3)", cex=0.5, coef="stress_vs_ctrl_in_WT")  # MA plot 
+plotMDS(v, main="plotMDS(v)",cex=0.5,col=c(rep("red",3),rep("green",3),rep("blue",3),rep("black",3)))
+plotDensities(v, main="plotDensities(v)",cex=0.5,legend=F)
+```
+
+## Do gene set enrichment analysis (GSEA)  
+
+Load arabidopsis geneset info
+(plant geneset from http://structuralbiology.cau.edu.cn/PlantGSEA/download.php)
+```{r}
+load(file="Ara_genesets2.RData")
+```
+
+Loads arasets, which defines the genesets.
+Also loads dset_desc (used later), which describes the genesets.
+
+## We need to convert from gene symbols to the index of the gene in the data to call romer() (see documentation)
+```{r}
+C2t <- ids2indices(arasets, rownames(v))
+```
+
+# Do romer GSEA on each contrast of interest
+
+#### (Y.R This seems to deal with HTS issue  (1) Poisson count noise as it modeling using a negative binomial distribution.)
+```{r}
+rr_resUP = list()
+rr_resDN = list()
+rr_resMIXED = list()
+
+for (jj in colnames(cont.matrix)) {
+  cat(jj, "\n")
+  # call romer for GSEA. v stores our count data (with weights); C2t stores the gene set information; design stores the experimental design; contrast stores our particular contrasts of interest
+  rr <- romer(v,C2t,design=design,contrast=cont.matrix[,jj],nrot=1000)      # ideally, should do >= 1000 rotations
+  romerUP_rr=topRomer(rr,n=20,alt="up")
+  romerDN_rr=topRomer(rr,alt="down")
+  romerMIXED_rr=topRomer(rr,alt="mixed")
+  
+  # This R code simply includes the geneset descriptions in the output (note: arrange() orders by the column "Up")
+  romerUP_rr  = arrange(merge(data.frame(romerUP_rr), dset_desc, by.x="row.names", by.y="V1",all.x=T), Up)
+  romerDN_rr  = arrange(merge(data.frame(romerDN_rr), dset_desc, by.x="row.names", by.y="V1",all.x=T), Down)
+  romerMIXED_rr  = arrange(merge(data.frame(romerMIXED_rr), dset_desc, by.x="row.names", by.y="V1",all.x=T), Mixed)
+  
+  rr_resUP[[jj]] = romerUP_rr
+  rr_resDN[[jj]] = romerDN_rr
+  rr_resMIXED[[jj]] = romerMIXED_rr
+}
+res_dir = "./" 
+RData_dir = "./"
+WriteXLS("rr_resMIXED",Encoding="latin1",ExcelFileName=paste(res_dir,"romer_rrMIXED_res.xls",sep=""),row.names=F, FreezeRow=1,FreezeCol=1,AdjWidth=F)	
+WriteXLS("rr_resUP",Encoding="latin1",ExcelFileName=paste(res_dir,"romer_rrUP_res.xls",  sep=""),row.names=F, FreezeRow=1,FreezeCol=1,AdjWidth=F)	
+WriteXLS("rr_resDN",Encoding="latin1", ExcelFileName=paste(res_dir,"romer_rrDN_res.xls",  sep=""),row.names=F, FreezeRow=1,FreezeCol=1,AdjWidth=F)	
+
+save(rr_resMIXED,rr_resUP,rr_resDN, file= paste(RData_dir,"romer_rr_res.RData",  sep=""))
+```
+
+## end of main example
+
+
+##Q3. Starting with the Rmarkdown file from the RNA-seq lab "limma_interaction_RNAseq_contrasts_GSEA7.Rmd", expand on my comments. 
+
+##In particular, list and number at the start of your document the major statistical issues for HTS we covered in lectures, and for each  relevant line or section of the pipeline describe which statistical issue is involved, referencing this list. 
+
+## (The issues are: 
+##(1) Poisson count noise, 
+##(2) Moderated t-test 
+##(3) Normalisation 
+##(4) Multiple testing correction).  
+
+##Then describe each statistical issue in a paragraph in your own words, referring to the relevant subsections of Conesa et al "A survey of best practices for RNA-seq data analysis" and Ritchie et al "limma powers differential expression analyses for RNA-sequencing and microarray studies" in your answer.
+
+
+*The first thing we need to do is deal with the noise that we can have when dealing with biological samples. According to the lecture, there are a few ways to deal with this noise. We can use linear modelling. We can use EdgeR, DeSeq2 & Limma. Limma seems to be prefered as it seems to be best when dealing with high thoughput data.You could use plotSA  as "a usuful diagnostic plot of the linear model fit" (Ritchie et.al page 7)** We need to use a t-test that is good for NGS samples and that would have to be a moderated t-test. According to the paper we can use the eBayes function to do this (page 8)** We need to find a way to mitigate the real estate effect as well as any causes of noise and therefore we need to do some normalization. Some people use TMM normalization to mitigate this. According to Conesa et. al. using TMM is better than TPM because it has less "biases" (Conesa et. al. page 7).In the paper by Ritchie et. al suggested that if "samples [...] are less reliable in a gene analysis" the weight assigned to it should be less and the opposite for "control probes during normalization" (Ritchie et.al page 3) **You also need to do some multiple testing correction for false discovey rate. You also have to mitigate for false negatives and you can use "[t]he propTrueNull function" (Ritchie et.al page 9) to do this.*
