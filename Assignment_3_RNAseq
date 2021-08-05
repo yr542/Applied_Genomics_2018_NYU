@@ -1,0 +1,5 @@
+Grade: 90.00 (max 100.00)
+
+Additional instructor's comments about your submission
+
+(-10) Q2: Incorrect operator -- divide the TMMs by the normalization factor. This would result in equal TMMs for all genes, bar the first one.
